@@ -1,0 +1,77 @@
+import pandas as pd
+import requests
+from dataclasses import dataclass
+import os
+
+@dataclass
+class API_Client:
+    """
+    API Client to interact with the Central Bank API.
+    """
+    user: str = os.getenv("BC_API_USER")
+    password: str = os.getenv("BC_API_PASSWORD")
+    
+    def search_series(self, frequency:str= 'DAILY') -> pd.DataFrame:
+        """
+        Search for series in the database and return SeriesInfos as a DataFrame.
+        """
+        url: str = f"https://si3.bcentral.cl/SieteRestWS/SieteRestWS.ashx?user={self.user}&pass={self.password}&frequency={frequency}&function=SearchSeries"
+        response = requests.get(url)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "SeriesInfos" in data and isinstance(data["SeriesInfos"], list):
+                # Convert SeriesInfos to a DataFrame
+                return pd.DataFrame(data["SeriesInfos"])
+            else:
+                raise ValueError("SeriesInfos key not found or is not a list in the API response")
+        else:
+            raise Exception(f"Error: {response.status_code} - {response.text}")
+    
+    def get_series(self, start: str = None, end: str = None, series_id: str = '-') -> pd.DataFrame:
+        """
+        Get series data for a given series ID and date range.
+        """
+
+        url : str = f"https://si3.bcentral.cl/SieteRestWS/SieteRestWS.ashx?user={self.user}&pass={self.password}&timeseries={series_id}&firstdate={start}&lastdate={end}"
+        
+        print(url)
+        
+        response = requests.get(url)
+        
+    
+
+        if response.status_code == 200:
+            data_json = response.json()
+            data = data_json['Series']['Obs']
+            df_data = pd.DataFrame(data)
+            df_data = df_data.rename(columns={"indexDateString": "FECHA", "value": "VALOR"})
+            df_data.insert(1, 'ID', series_id)
+            df_data.drop(columns=['statusCode'], inplace=True)
+            return df_data
+        else:
+            raise Exception(f"Error: {response.status_code} - {response.text}")
+
+@dataclass
+class Swaps(API_Client):
+    """
+    Clase para manejar datos de swaps.
+    """
+    series : pd.DataFrame = None
+    
+    def __post_init__(self):
+        super().__init__()
+        
+        # series de swaps
+        self.series = self.get_swaps_series()
+    
+    def get_swaps_series(self):
+        df_series_data : pd.DataFrame = self.search_series(frequency='DAILY')
+        df_series1 : pd.DataFrame = df_series_data[df_series_data['spanishTitle'].str.contains('Swap promedio camara')]
+        df_series2 : pd.DataFrame = df_series_data[df_series_data['spanishTitle'].str.contains('Swap promedio de camara')]
+        df_series : pd.DataFrame = pd.concat([df_series1, df_series2]).reset_index()
+        df_series = df_series.rename(columns={"seriesId": "ID", "spanishTitle": "TASA"})
+        df_series = df_series[['ID', 'TASA']]
+        
+        return df_series
+    
