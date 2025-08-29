@@ -2,6 +2,9 @@ import pandas as pd
 import requests
 from dataclasses import dataclass
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 @dataclass
 class API_Client:
@@ -70,8 +73,11 @@ class Swaps(API_Client):
         df_series1 : pd.DataFrame = df_series_data[df_series_data['spanishTitle'].str.contains('Swap promedio camara')]
         df_series2 : pd.DataFrame = df_series_data[df_series_data['spanishTitle'].str.contains('Swap promedio de camara')]
         df_series : pd.DataFrame = pd.concat([df_series1, df_series2]).reset_index()
-        df_series = df_series.rename(columns={"seriesId": "ID", "spanishTitle": "TASA"})
-        df_series = df_series[['ID', 'TASA']]
+        df_series = df_series.rename(columns={"seriesId": "ID", "spanishTitle": "DETALLE"})
+        df_series = df_series[['ID', 'DETALLE']]
+        df_series['TASA'] = df_series['ID'].apply(lambda x: x.replace(
+            'F022.SPC.TIN.', 'SPC-').replace('.UF.Z.D', '-UF').replace('.NO.Z.D', '-CLP').replace('F022.SPC.TPR.', 'SPC-')
+            )
         
-        return df_series
+        return df_series[['ID', 'TASA', 'DETALLE']]
     
