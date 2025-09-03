@@ -78,6 +78,29 @@ class Swaps(API_Client):
         df_series['TASA'] = df_series['ID'].apply(lambda x: x.replace(
             'F022.SPC.TIN.', 'SPC-').replace('.UF.Z.D', '-UF').replace('.NO.Z.D', '-CLP').replace('F022.SPC.TPR.', 'SPC-')
             )
-        
+    
         return df_series[['ID', 'TASA', 'DETALLE']]
+    
+    def get_swaps_rates(self,start:str, end:str) -> pd.DataFrame:
+        """_summary_
+
+        Args:
+            satrti (_type_): _description_
+
+        Returns:
+            pd.DataFrame: _description_
+        """
+        df_series = self.series.copy()
+        lst_df : list = []
+        for serie in list(df_series['ID']):
+            df_serie : pd.DataFrame = self.get_series(start=start, end=end, series_id=serie)
+            rate : str = df_series[df_series['ID'] == serie]['TASA'].values[0]
+            df_serie['ID'] = rate
+            lst_df.append(df_serie)
+        df_rates : pd.DataFrame = pd.concat(lst_df)
+        df_rates['VALOR'] = pd.to_numeric(df_rates['VALOR'], errors='coerce')
+        df_rates_pivot : pd.DataFrame = pd.pivot_table(df_rates, index='FECHA', columns='ID', values='VALOR', aggfunc='mean').reset_index()
+        df_rates_pivot = df_rates_pivot.rename_axis(None, axis=1)
+        return df_rates_pivot
+        
     
